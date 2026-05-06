@@ -1,0 +1,135 @@
+﻿@page "/transacciones"
+
+<div class="row g-0">
+    <div class="col-md-9 pe-4">
+        <div class="d-flex justify-content-between mb-3">
+            <h3>Gestión de Transacciones</h3>
+            <div class="d-flex gap-2">
+                <input type="text" class="form-control" placeholder="Filtrar por concepto..." />
+                <button class="btn btn-outline-secondary">Buscar</button>
+            </div>
+        </div>
+
+        <table class="table table-hover shadow-sm bg-white rounded overflow-hidden">
+            <thead class="table-dark">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Categoría</th>
+                    <th>Monto</th>
+                    <th>Tipo</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>22/04/2026</td>
+                    <td>Venta de Producto A</td>
+                    <td>Ventas</td>
+                    <td class="text-success">$1,500.00</td>
+                    <td><span class="badge bg-success">Ingreso</span></td>
+                    <td><button class="btn btn-sm btn-light">Ver</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-md-3 bg-light border-start p-3 shadow-sm vh-100 position-sticky top-0">
+        <h5 class="mb-4 text-center border-bottom pb-2">Opciones</h5>
+        <div class="d-grid gap-3">
+            <button class="btn btn-primary p-3 shadow-sm" @onclick="AbrirModal">
+                <span class="oi oi-plus"></span> Nueva Transacción
+            </button>
+            <button class="btn btn-outline-secondary p-3">
+                <span class="oi oi-print"></span> Exportar PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (mostrarModal)
+{
+    <div class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Registrar Nueva Transacción</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Fecha</label>
+                                <input type="date" class="form-control" @bind="nuevaT.Fecha" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Monto</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" @bind="nuevaT.Monto" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label small fw-bold">Concepto</label>
+                                <input type="text" class="form-control" @bind="nuevaT.Concepto" placeholder="Ej: Pago de renta" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Categoría</label>
+                                <select class="form-select" @bind="nuevaT.Categoria">
+                                    <option value="">Seleccionar...</option>
+                                    <option>Ventas</option>
+                                    <option>Sueldos</option>
+                                    <option>Marketing</option>
+                                    <option>Servicios</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Tipo</label>
+                                <select class="form-select" @bind="nuevaT.Tipo">
+                                    <option value="Gasto">Gasto 🔴</option>
+                                    <option value="Ingreso">Ingreso 🟢</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="Guardar">Guardar Transacción</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool mostrarModal = false;
+
+    // Objeto temporal para capturar los datos
+    private TransaccionSimple nuevaT = new TransaccionSimple();
+
+    void AbrirModal()
+    {
+        nuevaT = new TransaccionSimple { Fecha = DateTime.Now }; // Reinicia el objeto
+        mostrarModal = true;
+    }
+
+    void CerrarModal() => mostrarModal = false;
+
+    void Guardar()
+    {
+        // Aquí irá la lógica de guardado después
+        mostrarModal = false;
+    }
+
+    // Clase auxiliar interna para la interfaz
+    public class TransaccionSimple
+    {
+        public DateTime Fecha { get; set; }
+        public string Concepto { get; set; } = "";
+        public string Categoria { get; set; } = "";
+        public decimal Monto { get; set; }
+        public string Tipo { get; set; } = "Gasto";
+    }
+}

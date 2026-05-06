@@ -1,0 +1,42 @@
+﻿@page "/cuenta"
+
+<div class="container" style="max-width: 800px;">
+    <h3>Perfil de Usuario</h3>
+    <div class="card p-4 mb-4 shadow-sm border-0">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Nombre Completo</label>
+                <input type="text" class="form-control" value="Juan Emprendedor" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Teléfono</label>
+                <input type="text" class="form-control" value="555-0123" />
+            </div>
+        </div>
+        <button class="btn btn-primary w-auto">Guardar Cambios</button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Tus Empresas (1/3)</h4>
+        <button class="btn btn-sm btn-outline-primary">+ Agregar Empresa</button>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-12">
+            <div class="card p-3 border-start border-primary border-4 shadow-sm">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="mb-0">Mi Primer Emprendimiento S.A.</h5>
+                        <small class="text-muted">RFC: ABC123456XYZ</small>
+                    </div>
+                    <span class="badge bg-primary h-50">Activa</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="card p-3 border-dashed border-2 text-center text-muted" style="border: 2px dashed #ccc;">
+                Espacio disponible para empresa adicional
+            </div>
+        </div>
+    </div>
+</div>

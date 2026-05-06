@@ -1,0 +1,43 @@
+﻿@page "/"
+@layout EmptyLayout
+@inject NavigationManager Nav
+
+<div class="d-flex justify-content-center align-items-center vh-100 bg-light">
+    <div class="card shadow p-4" style="width: 350px;">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold text-primary">Bienvenido</h2>
+            <small class="text-muted">Ingresa a tu panel financiero</small>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Correo Electrónico</label>
+            <input type="text" class="form-control" @bind="userEmail" placeholder="usuario" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Contraseña</label>
+            <input type="password" class="form-control" @bind="userPass" placeholder="contraseña" />
+        </div>
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert alert-danger py-2">@error</div>
+        }
+        <button class="btn btn-primary w-100 py-2" @onclick="CheckLogin">Entrar</button>
+    </div>
+</div>
+
+@code {
+    string userEmail = "";
+    string userPass = "";
+    string error = "";
+
+    void CheckLogin()
+    {
+        if (userEmail == "usuario" && userPass == "contraseña")
+        {
+            Nav.NavigateTo("/dashboard");
+        }
+        else
+        {
+            error = "Credenciales incorrectas";
+        }
+    }
+}
