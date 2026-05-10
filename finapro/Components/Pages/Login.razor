@@ -1,43 +1,130 @@
 ﻿@page "/"
 @layout EmptyLayout
 @inject NavigationManager Nav
+@using finapro.Data
+@using finapro.Models
+@* Inyectamos el servicio de base de datos *@
+@inject DataService DB
 
 <div class="d-flex justify-content-center align-items-center vh-100 bg-light">
-    <div class="card shadow p-4" style="width: 350px;">
+    <div class="card shadow p-4" style="width: 380px;">
+        
         <div class="text-center mb-4">
-            <h2 class="fw-bold text-primary">Bienvenido</h2>
-            <small class="text-muted">Ingresa a tu panel financiero</small>
+            <h2 class="fw-bold text-primary">FinaPro</h2>
+            <small class="text-muted">@(esRegistro ? "Crea tu cuenta" : "Empieza a manejar tus finanzas")</small>
         </div>
-        <div class="mb-3">
-            <label class="form-label">Correo Electrónico</label>
-            <input type="text" class="form-control" @bind="userEmail" placeholder="usuario" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Contraseña</label>
-            <input type="password" class="form-control" @bind="userPass" placeholder="contraseña" />
-        </div>
-        @if (!string.IsNullOrEmpty(error))
+
+        @if (!string.IsNullOrEmpty(mensaje))
         {
-            <div class="alert alert-danger py-2">@error</div>
+            <div class="alert @(esError ? "alert-danger" : "alert-success") py-2 small">@mensaje</div>
         }
-        <button class="btn btn-primary w-100 py-2" @onclick="CheckLogin">Entrar</button>
+
+        @if (esRegistro)
+        {
+            <!-- FORMULARIO DE REGISTRO -->
+            <div class="mb-3">
+                <label class="form-label small">Nombre Completo</label>
+                <input type="text" class="form-control" @bind="nuevoUsuario.nombre" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Teléfono</label>
+                <input type="text" class="form-control" @bind="nuevoUsuario.telefono" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Correo Electrónico</label>
+                <input type="email" class="form-control" @bind="nuevoUsuario.correo" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Contraseña</label>
+                <input type="password" class="form-control" @bind="nuevoUsuario.password" />
+            </div>
+            <button class="btn btn-success w-100 py-2 mb-3" @onclick="CrearCuenta">Registrarme</button>
+            <div class="text-center">
+                <a href="javascript:void(0)" class="text-decoration-none small" @onclick="() => esRegistro = false">¿Ya tienes cuenta? Inicia sesión</a>
+            </div>
+        }
+        else
+        {
+            <!-- FORMULARIO DE LOGIN -->
+            <div class="mb-3">
+                <label class="form-label small">Correo Electrónico</label>
+                <input type="email" class="form-control" @bind="userEmail" placeholder="ejemplo@correo.com" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">Contraseña</label>
+                <input type="password" class="form-control" @bind="userPass" placeholder="******" />
+            </div>
+            <button class="btn btn-primary w-100 py-2 mb-3" @onclick="CheckLogin">Entrar</button>
+            <div class="text-center">
+                <a href="javascript:void(0)" class="text-decoration-none small" @onclick="() => esRegistro = true">¿No tienes cuenta? Regístrate</a>
+            </div>
+        }
     </div>
 </div>
 
 @code {
+    // Variables para el flujo
+    bool esRegistro = false;
+    string mensaje = "";
+    bool esError = false;
+
+    // Variables para Login
     string userEmail = "";
     string userPass = "";
-    string error = "";
+
+    // Objeto para Registro
+    Usuario nuevoUsuario = new Usuario();
 
     void CheckLogin()
     {
-        if (userEmail == "usuario" && userPass == "contraseña")
+        mensaje = "";
+        if (string.IsNullOrWhiteSpace(userEmail) || string.IsNullOrWhiteSpace(userPass))
         {
+            MostrarMensaje("Ingresa correo y contraseña.", true);
+            return;
+        }
+
+        // Llamada a la base de datos real
+        Usuario? u = DB.Login(userEmail, userPass);
+
+        if (u != null)
+        {
+            // Aquí en el futuro guardaremos el id del usuario en la sesión
             Nav.NavigateTo("/dashboard");
         }
         else
         {
-            error = "Credenciales incorrectas";
+            MostrarMensaje("Correo o contraseña incorrecta.", true);
         }
+    }
+
+    void CrearCuenta()
+    {
+        mensaje = "";
+        if (string.IsNullOrWhiteSpace(nuevoUsuario.nombre) || string.IsNullOrWhiteSpace(nuevoUsuario.correo) || string.IsNullOrWhiteSpace(nuevoUsuario.password))
+        {
+            MostrarMensaje("Nombre, correo y contraseña son obligatorios.", true);
+            return;
+        }
+
+        // Llamada a la base de datos real
+        string resultado = DB.RegistrarUsuario(nuevoUsuario);
+
+        if (resultado == "Registro exitoso")
+        {
+            MostrarMensaje("¡Cuenta creada!", false);
+            esRegistro = false; // Lo devolvemos a la pantalla de login
+            nuevoUsuario = new Usuario(); // Limpiamos el formulario
+        }
+        else
+        {
+            MostrarMensaje(resultado, true);
+        }
+    }
+
+    void MostrarMensaje(string msg, bool error)
+    {
+        mensaje = msg;
+        esError = error;
     }
 }
