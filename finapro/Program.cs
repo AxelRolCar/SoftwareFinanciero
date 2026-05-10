@@ -1,6 +1,8 @@
 using finapro.Components;
+using finapro.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton<DataService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
