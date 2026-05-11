@@ -86,5 +86,126 @@ namespace finapro.Data
                 return builder.ToString();
             }
         }
+
+        // --- OBTENER CATEGORÍAS ---
+        public List<Categoria> ObtenerCategorias()
+        {
+            List<Categoria> lista = new List<Categoria>();
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                string query = "SELECT * FROM Categoria";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        lista.Add(new Categoria
+                        {
+                            id = reader.GetInt32("id"),
+                            nombre = reader.GetString("nombre"),
+                            tipo = reader.GetString("tipo")
+                        });
+                    }
+                }
+            }
+            return lista;
+        }
+
+        // --- OBTENER TRANSACCIONES (FILTRADO POR EMPRESA) ---
+        public List<Transaccion> ObtenerTransacciones(int idEmpresa)
+        {
+            List<Transaccion> lista = new List<Transaccion>();
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                // Hacemos un JOIN para traernos el nombre de la categoría
+                string query = @"SELECT t.*, c.nombre as nombreCategoria 
+                         FROM Transaccion t 
+                         JOIN Categoria c ON t.idCategoria = c.id 
+                         WHERE t.idEmpresa = @idEmpresa 
+                         ORDER BY t.fecha DESC";
+
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@idEmpresa", idEmpresa);
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            lista.Add(new Transaccion
+                            {
+                                id = reader.GetInt32("id"),
+                                idEmpresa = reader.GetInt32("idEmpresa"),
+                                idCategoria = reader.GetInt32("idCategoria"),
+                                fecha = reader.GetDateTime("fecha"),
+                                concepto = reader.GetString("concepto"),
+                                monto = reader.GetDecimal("monto"),
+                                tipo = reader.GetString("tipo"),
+                                metodoPago = reader.IsDBNull(reader.GetOrdinal("metodoPago")) ? "" : reader.GetString("metodoPago"),
+                                estaFacturada = reader.GetBoolean("estaFacturada"),
+                                nombreCategoria = reader.GetString("nombreCategoria")
+                            });
+                        }
+                    }
+                }
+            }
+            return lista;
+        }
+
+        // --- GUARDAR O ACTUALIZAR TRANSACCIÓN ---
+        public void GuardarTransaccion(Transaccion t)
+        {
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                string query;
+
+                // Si el id es 0, es un registro nuevo (INSERT). Si tiene id, es modificación (UPDATE).
+                if (t.id == 0)
+                {
+                    query = @"INSERT INTO Transaccion (idEmpresa, idCategoria, fecha, concepto, monto, tipo, metodoPago, estaFacturada) 
+                      VALUES (@emp, @cat, @fec, @con, @mon, @tip, @met, @fac)";
+                }
+                else
+                {
+                    query = @"UPDATE Transaccion SET idCategoria=@cat, fecha=@fec, concepto=@con, 
+                      monto=@mon, tipo=@tip, metodoPago=@met, estaFacturada=@fac 
+                      WHERE id=@id AND idEmpresa=@emp";
+                }
+
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    if (t.id != 0) cmd.Parameters.AddWithValue("@id", t.id);
+                    cmd.Parameters.AddWithValue("@emp", t.idEmpresa);
+                    cmd.Parameters.AddWithValue("@cat", t.idCategoria);
+                    cmd.Parameters.AddWithValue("@fec", t.fecha);
+                    cmd.Parameters.AddWithValue("@con", t.concepto);
+                    cmd.Parameters.AddWithValue("@mon", t.monto);
+                    cmd.Parameters.AddWithValue("@tip", t.tipo);
+                    cmd.Parameters.AddWithValue("@met", t.metodoPago);
+                    cmd.Parameters.AddWithValue("@fac", t.estaFacturada);
+
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // --- ELIMINAR TRANSACCIÓN ---
+        public void EliminarTransaccion(int idTransaccion, int idEmpresa)
+        {
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                // Validamos el idEmpresa por seguridad, para que nadie borre transacciones de otros
+                string query = "DELETE FROM Transaccion WHERE id = @id AND idEmpresa = @emp";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", idTransaccion);
+                    cmd.Parameters.AddWithValue("@emp", idEmpresa);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }
