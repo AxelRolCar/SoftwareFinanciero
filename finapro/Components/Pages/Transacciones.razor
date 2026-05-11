@@ -1,135 +1,210 @@
 ﻿@page "/transacciones"
+@inject finapro.Data.DataService DB
+@using finapro.Models
 
-<div class="row g-0">
-    <div class="col-md-9 pe-4">
-        <div class="d-flex justify-content-between mb-3">
-            <h3>Gestión de Transacciones</h3>
-            <div class="d-flex gap-2">
-                <input type="text" class="form-control" placeholder="Filtrar por concepto..." />
-                <button class="btn btn-outline-secondary">Buscar</button>
-            </div>
-        </div>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Mis Transacciones</h3>
+        <button class="btn btn-primary" @onclick="AbrirModalNuevo">
+            <i class="bi bi-plus-circle"></i> Nueva Transacción
+        </button>
+    </div>
 
-        <table class="table table-hover shadow-sm bg-white rounded overflow-hidden">
-            <thead class="table-dark">
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered bg-white shadow-sm">
+            <thead class="table-light">
                 <tr>
                     <th>Fecha</th>
                     <th>Concepto</th>
                     <th>Categoría</th>
+                    <th>Método de Pago</th>
+                    <th>Facturada</th>
                     <th>Monto</th>
                     <th>Tipo</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>22/04/2026</td>
-                    <td>Venta de Producto A</td>
-                    <td>Ventas</td>
-                    <td class="text-success">$1,500.00</td>
-                    <td><span class="badge bg-success">Ingreso</span></td>
-                    <td><button class="btn btn-sm btn-light">Ver</button></td>
-                </tr>
+                @if (listaTransacciones == null || listaTransacciones.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted">No hay transacciones registradas.</td></tr>
+                }
+                else
+                {
+                    @foreach (var t in listaTransacciones)
+                    {
+                        <tr>
+                            <td>@t.fecha.ToString("dd/MM/yyyy")</td>
+                            <td>@t.concepto</td>
+                            <td><span class="badge bg-secondary">@t.nombreCategoria</span></td>
+                            <td>@t.metodoPago</td>
+                            <td>
+                                @if (t.estaFacturada)
+                                {
+                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> Sí</span>
+                                }
+                                else
+                                {
+
+                                    <span class="text-muted">No</span>
+                                }
+                            </td>
+                            <td class="fw-bold @(t.tipo == "Ingreso" ? "text-success" : "text-danger")">
+                                $@t.monto.ToString("N2")
+                            </td>
+                            <td>@t.tipo</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => AbrirModalEditar(t)">Editar</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => Borrar(t.id)">Eliminar</button>
+                            </td>
+                        </tr>
+                    }
+                }
             </tbody>
         </table>
     </div>
 
-    <div class="col-md-3 bg-light border-start p-3 shadow-sm vh-100 position-sticky top-0">
-        <h5 class="mb-4 text-center border-bottom pb-2">Opciones</h5>
-        <div class="d-grid gap-3">
-            <button class="btn btn-primary p-3 shadow-sm" @onclick="AbrirModal">
-                <span class="oi oi-plus"></span> Nueva Transacción
-            </button>
-            <button class="btn btn-outline-secondary p-3">
-                <span class="oi oi-print"></span> Exportar PDF
-            </button>
-        </div>
-    </div>
-</div>
+    @if (mostrarModal)
+    {
+        <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(transaccionActual.id == 0 ? "Nueva Transacción" : "Editar Transacción")</h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label class="form-label small">Tipo</label>
+                            <select class="form-select" @bind="transaccionActual.tipo">
+                                <option value="Ingreso">Ingreso</option>
+                                <option value="Gasto">Gasto</option>
+                            </select>
+                        </div>
 
-@if (mostrarModal)
-{
-    <div class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Registrar Nueva Transacción</h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModal"></button>
-                </div>
-                <div class="modal-body">
-                    <form>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Fecha</label>
-                                <input type="date" class="form-control" @bind="nuevaT.Fecha" />
+                        <div class="mb-2">
+                            <label class="form-label small">Concepto</label>
+                            <input type="text" class="form-control" @bind="transaccionActual.concepto" placeholder="Ej. Venta de software" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small">Monto ($)</label>
+                                <input type="number" step="0.01" class="form-control" @bind="transaccionActual.monto" />
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Monto</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" @bind="nuevaT.Monto" placeholder="0.00" />
-                                </div>
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label small fw-bold">Concepto</label>
-                                <input type="text" class="form-control" @bind="nuevaT.Concepto" placeholder="Ej: Pago de renta" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Categoría</label>
-                                <select class="form-select" @bind="nuevaT.Categoria">
-                                    <option value="">Seleccionar...</option>
-                                    <option>Ventas</option>
-                                    <option>Sueldos</option>
-                                    <option>Marketing</option>
-                                    <option>Servicios</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Tipo</label>
-                                <select class="form-select" @bind="nuevaT.Tipo">
-                                    <option value="Gasto">Gasto 🔴</option>
-                                    <option value="Ingreso">Ingreso 🟢</option>
-                                </select>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small">Fecha</label>
+                                <input type="date" class="form-control" @bind="transaccionActual.fecha" />
                             </div>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" @onclick="Guardar">Guardar Transacción</button>
+
+                        <div class="mb-2">
+                            <label class="form-label small">Categoría</label>
+                            <select class="form-select" @bind="transaccionActual.idCategoria">
+                                <option value="0">Selecciona una...</option>
+                                @foreach (var c in listaCategorias.Where(x => x.tipo == transaccionActual.tipo))
+                                {
+                                    <option value="@c.id">@c.nombre</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small">Método de Pago</label>
+                                <select class="form-select" @bind="transaccionActual.metodoPago">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Tarjeta">Tarjeta de Crédito/Débito</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="transaccionActual.estaFacturada" id="chkFacturada">
+                                    <label class="form-check-label small" for="chkFacturada">
+                                        Genera Factura
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="button" class="btn btn-success" @onclick="Guardar">Guardar</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-}
+    }
+</div>
 
 @code {
-    private bool mostrarModal = false;
+    // IMPORTANTE: Aquí simulamos que el usuario tiene abierta su empresa número 1.
+    int empresaActivaId = 1;
 
-    // Objeto temporal para capturar los datos
-    private TransaccionSimple nuevaT = new TransaccionSimple();
+    List<Transaccion> listaTransacciones = new();
+    List<Categoria> listaCategorias = new();
+    Transaccion transaccionActual = new Transaccion();
+    bool mostrarModal = false;
 
-    void AbrirModal()
+    protected override void OnInitialized()
     {
-        nuevaT = new TransaccionSimple { Fecha = DateTime.Now }; // Reinicia el objeto
+        // Al cargar la página, traemos los datos de la base de datos
+        CargarDatos();
+        listaCategorias = DB.ObtenerCategorias();
+    }
+
+    void CargarDatos()
+    {
+        listaTransacciones = DB.ObtenerTransacciones(empresaActivaId);
+    }
+
+    void AbrirModalNuevo()
+    {
+        // Limpiamos el objeto para crear uno nuevo asociado a la empresa activa
+        transaccionActual = new Transaccion { idEmpresa = empresaActivaId, fecha = DateTime.Now };
         mostrarModal = true;
     }
 
-    void CerrarModal() => mostrarModal = false;
-
-    void Guardar()
+    void AbrirModalEditar(Transaccion t)
     {
-        // Aquí irá la lógica de guardado después
+        // Clonamos los datos para no modificar la lista en vivo si el usuario cancela
+        transaccionActual = new Transaccion
+        {
+            id = t.id,
+            idEmpresa = t.idEmpresa,
+            idCategoria = t.idCategoria,
+            fecha = t.fecha,
+            concepto = t.concepto,
+            monto = t.monto,
+            tipo = t.tipo,
+            metodoPago = t.metodoPago,
+            estaFacturada = t.estaFacturada
+        };
+        mostrarModal = true;
+    }
+
+    void CerrarModal()
+    {
         mostrarModal = false;
     }
 
-    // Clase auxiliar interna para la interfaz
-    public class TransaccionSimple
+    void Guardar()
     {
-        public DateTime Fecha { get; set; }
-        public string Concepto { get; set; } = "";
-        public string Categoria { get; set; } = "";
-        public decimal Monto { get; set; }
-        public string Tipo { get; set; } = "Gasto";
+        if (string.IsNullOrWhiteSpace(transaccionActual.concepto) || transaccionActual.idCategoria == 0 || transaccionActual.monto <= 0)
+        {
+            // Aquí podrías agregar un mensaje de error o validación visual
+            return;
+        }
+
+        DB.GuardarTransaccion(transaccionActual);
+        mostrarModal = false;
+        CargarDatos(); // Recargamos la tabla
+    }
+
+    void Borrar(int id)
+    {
+        DB.EliminarTransaccion(id, empresaActivaId);
+        CargarDatos(); // Recargamos la tabla
     }
 }
