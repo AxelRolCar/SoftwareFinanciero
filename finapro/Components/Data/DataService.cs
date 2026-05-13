@@ -144,7 +144,8 @@ namespace finapro.Data
                                 tipo = reader.GetString("tipo"),
                                 metodoPago = reader.IsDBNull(reader.GetOrdinal("metodoPago")) ? "" : reader.GetString("metodoPago"),
                                 estaFacturada = reader.GetBoolean("estaFacturada"),
-                                nombreCategoria = reader.GetString("nombreCategoria")
+                                nombreCategoria = reader.GetString("nombreCategoria"),
+                                idFactura = reader["idFactura"]?.ToString()
                             });
                         }
                     }
@@ -164,13 +165,13 @@ namespace finapro.Data
                 // Si el id es 0, es un registro nuevo (INSERT). Si tiene id, es modificación (UPDATE).
                 if (t.id == 0)
                 {
-                    query = @"INSERT INTO Transaccion (idEmpresa, idCategoria, fecha, concepto, monto, tipo, metodoPago, estaFacturada) 
-                      VALUES (@emp, @cat, @fec, @con, @mon, @tip, @met, @fac)";
+                    query = @"INSERT INTO Transaccion (idEmpresa, idCategoria, fecha, concepto, monto, tipo, metodoPago, estaFacturada, idFactura) 
+                      VALUES (@emp, @cat, @fec, @con, @mon, @tip, @met, @fac, @idFactura)";
                 }
                 else
                 {
                     query = @"UPDATE Transaccion SET idCategoria=@cat, fecha=@fec, concepto=@con, 
-                      monto=@mon, tipo=@tip, metodoPago=@met, estaFacturada=@fac 
+                      monto=@mon, tipo=@tip, metodoPago=@met, estaFacturada=@fac, idFactura=@idFactura
                       WHERE id=@id AND idEmpresa=@emp";
                 }
 
@@ -185,7 +186,7 @@ namespace finapro.Data
                     cmd.Parameters.AddWithValue("@tip", t.tipo);
                     cmd.Parameters.AddWithValue("@met", t.metodoPago);
                     cmd.Parameters.AddWithValue("@fac", t.estaFacturada);
-
+                    cmd.Parameters.AddWithValue("@idFactura", (object)t.idFactura ?? DBNull.Value);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -203,6 +204,36 @@ namespace finapro.Data
                 {
                     cmd.Parameters.AddWithValue("@id", idTransaccion);
                     cmd.Parameters.AddWithValue("@emp", idEmpresa);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void InsertarCategoria(Categoria c)
+        {
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                string query = "INSERT INTO Categoria (nombre, tipo) VALUES (@nom, @tip)";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@nom", c.nombre);
+                    cmd.Parameters.AddWithValue("@tip", c.tipo);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void EliminarCategoria(int id)
+        {
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                // Nota: Esto fallará si hay transacciones usando esta categoría (integridad referencial)
+                string query = "DELETE FROM Categoria WHERE id = @id";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", id);
                     cmd.ExecuteNonQuery();
                 }
             }

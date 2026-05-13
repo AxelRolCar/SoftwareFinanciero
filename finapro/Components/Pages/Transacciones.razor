@@ -8,7 +8,12 @@
         <button class="btn btn-primary" @onclick="AbrirModalNuevo">
             <i class="bi bi-plus-circle"></i> Nueva Transacción
         </button>
+        <button class="btn btn-outline-primary" @onclick="AbrirModalCategorias">
+            <i class="bi bi-tags"></i> Administrar Categorías
+        </button>
     </div>
+
+    
 
     <div class="table-responsive">
         <table class="table table-hover table-bordered bg-white shadow-sm">
@@ -41,7 +46,7 @@
                             <td>
                                 @if (t.estaFacturada)
                                 {
-                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> Sí</span>
+                                    <small class="text-muted"><i class="bi bi-file-text"></i> @t.idFactura</small>
                                 }
                                 else
                                 {
@@ -125,6 +130,16 @@
                                         Genera Factura
                                     </label>
                                 </div>
+                                @if (transaccionActual.estaFacturada)
+                                {
+                                    <div class="mb-3 animate__animated animate__fadeIn">
+                                        <label class="form-label small fw-bold">Folio de Factura</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text"><i class="bi bi-file-earmark-text"></i></span>
+                                            <input type="text" class="form-control" @bind="transaccionActual.idFactura" placeholder="Ej. A-150" />
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -137,6 +152,46 @@
         </div>
     }
 </div>
+
+@if (mostrarModalCats)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Administrar Categorías</h5>
+                    <button type="button" class="btn-close" @onclick="() => mostrarModalCats = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        @foreach (var tipo in new[] { "Ingreso", "Gasto" })
+                        {
+                            <div class="col-md-6 border-end">
+                                <h6 class="text-center fw-bold @(tipo == "Ingreso" ? "text-success" : "text-danger")">@tipo</h6>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control form-control-sm" placeholder="Nueva categoría..."
+                                           @bind="nombresNuevasCats[tipo]" />
+                                    <button class="btn btn-sm btn-primary" @onclick="() => AgregarCat(tipo)">+</button>
+                                </div>
+                                <ul class="list-group list-group-flush overflow-auto" style="max-height: 200px;">
+                                    @foreach (var cat in listaCategorias.Where(x => x.tipo == tipo))
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                            <span class="small">@cat.nombre</span>
+                                            <button class="btn btn-sm text-danger" @onclick="() => BorrarCat(cat.id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     // IMPORTANTE: Aquí simulamos que el usuario tiene abierta su empresa número 1.
@@ -206,5 +261,39 @@
     {
         DB.EliminarTransaccion(id, empresaActivaId);
         CargarDatos(); // Recargamos la tabla
+    }
+
+    bool mostrarModalCats = false;
+    // Diccionario para manejar el texto de los dos inputs (Ingreso/Gasto) por separado
+    Dictionary<string, string> nombresNuevasCats = new() { { "Ingreso", "" }, { "Gasto", "" } };
+
+    void AbrirModalCategorias()
+    {
+        listaCategorias = DB.ObtenerCategorias(); // Refrescar lista
+        mostrarModalCats = true;
+    }
+
+    void AgregarCat(string tipo)
+    {
+        if (!string.IsNullOrWhiteSpace(nombresNuevasCats[tipo]))
+        {
+            var nueva = new Categoria { nombre = nombresNuevasCats[tipo], tipo = tipo };
+            DB.InsertarCategoria(nueva);
+            nombresNuevasCats[tipo] = ""; // Limpiar input
+            listaCategorias = DB.ObtenerCategorias(); // Refrescar vista
+        }
+    }
+
+    void BorrarCat(int id)
+    {
+        try
+        {
+            DB.EliminarCategoria(id);
+            listaCategorias = DB.ObtenerCategorias();
+        }
+        catch
+        {
+            // Aquí podrías mostrar un error si la categoría está en uso
+        }
     }
 }
