@@ -1,42 +1,149 @@
 ﻿@page "/cuenta"
+@inject finapro.Data.DataService DB
+@inject finapro.Data.AppState State
+@inject NavigationManager Nav
+@using finapro.Models
 
 <div class="container" style="max-width: 800px;">
+    @if (State.UsuarioActual == null)
+    {
+        <div class="alert alert-warning">Por favor inicia sesión.</div>
+        return;
+    }
+
     <h3>Perfil de Usuario</h3>
     <div class="card p-4 mb-4 shadow-sm border-0">
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Nombre Completo</label>
-                <input type="text" class="form-control" value="Juan Emprendedor" />
+                <input type="text" class="form-control" value="@State.UsuarioActual.nombre" disabled />
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">Teléfono</label>
-                <input type="text" class="form-control" value="555-0123" />
+                <label class="form-label">Correo</label>
+                <input type="text" class="form-control" value="@State.UsuarioActual.correo" disabled />
             </div>
         </div>
-        <button class="btn btn-primary w-auto">Guardar Cambios</button>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4>Tus Empresas (1/3)</h4>
-        <button class="btn btn-sm btn-outline-primary">+ Agregar Empresa</button>
+        <h4>Tus Empresas (@empresas.Count/3)</h4>
+        @if (empresas.Count < 3)
+        {
+            <button class="btn btn-sm btn-outline-primary" @onclick="MostrarModalNuevaEmpresa">+ Agregar Empresa</button>
+        }
     </div>
 
+    @if (!string.IsNullOrEmpty(mensajeError))
+    {
+        <div class="alert alert-danger py-2 small">@mensajeError</div>
+    }
+
     <div class="row g-3">
-        <div class="col-md-12">
-            <div class="card p-3 border-start border-primary border-4 shadow-sm">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="mb-0">Mi Primer Emprendimiento S.A.</h5>
-                        <small class="text-muted">RFC: ABC123456XYZ</small>
+        @foreach (var emp in empresas)
+        {
+            bool esActiva = State.EmpresaActiva?.id == emp.id;
+            
+            <div class="col-md-12">
+                <div class="card p-3 border-start @(esActiva ? "border-success" : "border-primary") border-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">@emp.nombre</h5>
+                            <small class="text-muted">RFC: @(string.IsNullOrEmpty(emp.rfc) ? "N/A" : emp.rfc)</small>
+                        </div>
+                        <div>
+                            @if (esActiva)
+                            {
+                                <span class="badge bg-success h-50 me-2">Activa en Sesión</span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick="() => SeleccionarEmpresa(emp)">Seleccionar</button>
+                            }
+                        </div>
                     </div>
-                    <span class="badge bg-primary h-50">Activa</span>
                 </div>
             </div>
-        </div>
-        <div class="col-md-12">
-            <div class="card p-3 border-dashed border-2 text-center text-muted" style="border: 2px dashed #ccc;">
-                Espacio disponible para empresa adicional
+        }
+
+        @for (int i = empresas.Count; i < 3; i++)
+        {
+            <div class="col-md-12">
+                <div class="card p-3 border-dashed border-2 text-center text-muted" style="border: 2px dashed #ccc;">
+                    Espacio disponible para empresa adicional
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (mostrandoModal)
+    {
+        <div class="card shadow mt-4 border-info">
+            <div class="card-header bg-info text-white">Nueva Empresa</div>
+            <div class="card-body">
+                <input type="text" class="form-control mb-2" placeholder="Nombre de la empresa" @bind="nuevaEmpresa.nombre" />
+                <input type="text" class="form-control mb-2" placeholder="RFC (Opcional)" @bind="nuevaEmpresa.rfc" />
+                <input type="text" class="form-control mb-3" placeholder="Dirección (Opcional)" @bind="nuevaEmpresa.direccion" />
+                <button class="btn btn-success" @onclick="GuardarEmpresa">Guardar</button>
+                <button class="btn btn-secondary" @onclick="() => mostrandoModal = false">Cancelar</button>
             </div>
         </div>
-    </div>
+    }
 </div>
+
+@code {
+    List<Empresa> empresas = new List<Empresa>();
+    Empresa nuevaEmpresa = new Empresa();
+    bool mostrandoModal = false;
+    string mensajeError = "";
+
+    protected override void OnInitialized()
+    {
+        if (State.UsuarioActual != null)
+        {
+            CargarEmpresas();
+        }
+    }
+
+    void CargarEmpresas()
+    {
+        empresas = DB.ObtenerEmpresas(State.UsuarioActual!.id);
+        
+        // Si hay empresas pero ninguna seleccionada, autoselecciona la primera
+        if (empresas.Any() && State.EmpresaActiva == null)
+        {
+            State.SetEmpresaActiva(empresas.First());
+        }
+    }
+
+    void MostrarModalNuevaEmpresa()
+    {
+        nuevaEmpresa = new Empresa { idUsuario = State.UsuarioActual!.id };
+        mostrandoModal = true;
+        mensajeError = "";
+    }
+
+    void GuardarEmpresa()
+    {
+        if (string.IsNullOrWhiteSpace(nuevaEmpresa.nombre))
+        {
+            mensajeError = "El nombre de la empresa es obligatorio.";
+            return;
+        }
+
+        string resultado = DB.AgregarEmpresa(nuevaEmpresa);
+        if (resultado == "OK")
+        {
+            mostrandoModal = false;
+            CargarEmpresas();
+        }
+        else
+        {
+            mensajeError = resultado;
+        }
+    }
+
+    void SeleccionarEmpresa(Empresa emp)
+    {
+        State.SetEmpresaActiva(emp);
+    }
+}
