@@ -5,6 +5,7 @@
 @using finapro.Models
 @* Inyectamos el servicio de base de datos *@
 @inject DataService DB
+@inject AppState State
 
 <div class="d-flex justify-content-center align-items-center vh-100 bg-light">
     <div class="card shadow p-4" style="width: 380px;">
@@ -89,7 +90,12 @@
 
         if (u != null)
         {
-            // Aquí en el futuro guardaremos el id del usuario en la sesión
+            State.SetUsuario(u);
+            var empresasDelUsuario = DB.ObtenerEmpresas(u.id);
+            if (empresasDelUsuario.Any())
+            {
+                State.SetEmpresaActiva(empresasDelUsuario.First()); // Asignamos la primera como activa
+            }
             Nav.NavigateTo("/dashboard");
         }
         else

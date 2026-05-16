@@ -1,5 +1,6 @@
 ﻿@page "/transacciones"
 @inject finapro.Data.DataService DB
+@inject finapro.Data.AppState State
 @using finapro.Models
 
 <div class="container mt-4">
@@ -194,8 +195,6 @@
 }
 
 @code {
-    // IMPORTANTE: Aquí simulamos que el usuario tiene abierta su empresa número 1.
-    int empresaActivaId = 1;
 
     List<Transaccion> listaTransacciones = new();
     List<Categoria> listaCategorias = new();
@@ -206,18 +205,18 @@
     {
         // Al cargar la página, traemos los datos de la base de datos
         CargarDatos();
-        listaCategorias = DB.ObtenerCategorias();
+        listaCategorias = DB.ObtenerCategorias(State?.EmpresaActiva?.id ?? 0);
     }
 
     void CargarDatos()
     {
-        listaTransacciones = DB.ObtenerTransacciones(empresaActivaId);
+        listaTransacciones = DB.ObtenerTransacciones(State?.EmpresaActiva?.id ?? 0);
     }
 
     void AbrirModalNuevo()
     {
         // Limpiamos el objeto para crear uno nuevo asociado a la empresa activa
-        transaccionActual = new Transaccion { idEmpresa = empresaActivaId, fecha = DateTime.Now };
+        transaccionActual = new Transaccion { idEmpresa = State?.EmpresaActiva?.id ?? 0, fecha = DateTime.Now };
         mostrarModal = true;
     }
 
@@ -259,7 +258,7 @@
 
     void Borrar(int id)
     {
-        DB.EliminarTransaccion(id, empresaActivaId);
+        DB.EliminarTransaccion(id, State?.EmpresaActiva?.id ?? 0);
         CargarDatos(); // Recargamos la tabla
     }
 
@@ -269,7 +268,7 @@
 
     void AbrirModalCategorias()
     {
-        listaCategorias = DB.ObtenerCategorias(); // Refrescar lista
+        listaCategorias = DB.ObtenerCategorias(State?.EmpresaActiva?.id ?? 0); // Refrescar lista
         mostrarModalCats = true;
     }
 
@@ -277,10 +276,10 @@
     {
         if (!string.IsNullOrWhiteSpace(nombresNuevasCats[tipo]))
         {
-            var nueva = new Categoria { nombre = nombresNuevasCats[tipo], tipo = tipo };
+            var nueva = new Categoria { nombre = nombresNuevasCats[tipo], tipo = tipo, idEmpresa = State?.EmpresaActiva?.id ?? 0 };
             DB.InsertarCategoria(nueva);
             nombresNuevasCats[tipo] = ""; // Limpiar input
-            listaCategorias = DB.ObtenerCategorias(); // Refrescar vista
+            listaCategorias = DB.ObtenerCategorias(State?.EmpresaActiva?.id ?? 0); // Refrescar vista
         }
     }
 
@@ -289,7 +288,7 @@
         try
         {
             DB.EliminarCategoria(id);
-            listaCategorias = DB.ObtenerCategorias();
+            listaCategorias = DB.ObtenerCategorias(State?.EmpresaActiva?.id ?? 0);
         }
         catch
         {

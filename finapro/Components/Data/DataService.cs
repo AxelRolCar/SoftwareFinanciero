@@ -88,24 +88,31 @@ namespace finapro.Data
         }
 
         // --- OBTENER CATEGORÍAS ---
-        public List<Categoria> ObtenerCategorias()
+        public List<Categoria> ObtenerCategorias(int idEmpresa)
         {
             List<Categoria> lista = new List<Categoria>();
             using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
             {
                 conn.Open();
-                string query = "SELECT * FROM Categoria";
+                // Filtramos por la empresa activa o categorías del sistema (NULL)
+                string query = "SELECT * FROM Categoria WHERE idEmpresa = @idEmpresa OR idEmpresa IS NULL";
                 using (MySqlCommand cmd = new MySqlCommand(query, conn))
-                using (MySqlDataReader reader = cmd.ExecuteReader())
                 {
-                    while (reader.Read())
+                    cmd.Parameters.AddWithValue("@idEmpresa", idEmpresa);
+
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
-                        lista.Add(new Categoria
+                        while (reader.Read())
                         {
-                            id = reader.GetInt32("id"),
-                            nombre = reader.GetString("nombre"),
-                            tipo = reader.GetString("tipo")
-                        });
+                            lista.Add(new Categoria
+                            {
+                                id = reader.GetInt32("id"),
+                                // Validamos si es nulo en la BD (categoría global) para que no truene
+                                idEmpresa = reader.IsDBNull(reader.GetOrdinal("idEmpresa")) ? 0 : reader.GetInt32("idEmpresa"),
+                                nombre = reader.GetString("nombre"),
+                                tipo = reader.GetString("tipo")
+                            });
+                        }
                     }
                 }
             }
@@ -186,7 +193,7 @@ namespace finapro.Data
                     cmd.Parameters.AddWithValue("@tip", t.tipo);
                     cmd.Parameters.AddWithValue("@met", t.metodoPago);
                     cmd.Parameters.AddWithValue("@fac", t.estaFacturada);
-                    cmd.Parameters.AddWithValue("@idFactura", (object)t.idFactura ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@idFactura", t.idFactura ?? (object)DBNull.Value);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -214,11 +221,14 @@ namespace finapro.Data
             using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
             {
                 conn.Open();
-                string query = "INSERT INTO Categoria (nombre, tipo) VALUES (@nom, @tip)";
+                // Añadimos idEmpresa a los campos a insertar
+                string query = "INSERT INTO Categoria (idEmpresa, nombre, tipo) VALUES (@idEmpresa, @nom, @tip)";
                 using (MySqlCommand cmd = new MySqlCommand(query, conn))
                 {
+                    cmd.Parameters.AddWithValue("@idEmpresa", c.idEmpresa);
                     cmd.Parameters.AddWithValue("@nom", c.nombre);
                     cmd.Parameters.AddWithValue("@tip", c.tipo);
+
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -235,6 +245,68 @@ namespace finapro.Data
                 {
                     cmd.Parameters.AddWithValue("@id", id);
                     cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // --- OBTENER EMPRESAS DEL USUARIO ---
+        public List<Empresa> ObtenerEmpresas(int idUsuario)
+        {
+            List<Empresa> lista = new List<Empresa>();
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+                string query = "SELECT * FROM Empresa WHERE idUsuario = @idUsuario ORDER BY fechaC ASC";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@idUsuario", idUsuario);
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            lista.Add(new Empresa
+                            {
+                                id = reader.GetInt32("id"),
+                                idUsuario = reader.GetInt32("idUsuario"),
+                                nombre = reader.GetString("nombre"),
+                                rfc = reader.IsDBNull(reader.GetOrdinal("rfc")) ? null : reader.GetString("rfc"),
+                                direccion = reader.IsDBNull(reader.GetOrdinal("direccion")) ? null : reader.GetString("direccion"),
+                                fechaC = reader.GetDateTime("fechaC")
+                            });
+                        }
+                    }
+                }
+            }
+            return lista;
+        }
+
+        // --- CREAR EMPRESA CON LÍMITE Y PROTECCIÓN DE NULOS ---
+        public string AgregarEmpresa(Empresa e)
+        {
+            using (MySqlConnection conn = new MySqlConnection(cadenaConexion))
+            {
+                conn.Open();
+
+                // 1. Validar límite de 3 empresas
+                string countQuery = "SELECT COUNT(*) FROM Empresa WHERE idUsuario = @idUsuario";
+                using (MySqlCommand countCmd = new MySqlCommand(countQuery, conn))
+                {
+                    countCmd.Parameters.AddWithValue("@idUsuario", e.idUsuario);
+                    int total = Convert.ToInt32(countCmd.ExecuteScalar());
+                    if (total >= 3) return "Has alcanzado el límite máximo de 3 empresas.";
+                }
+
+                // 2. Insertar. Usamos DBNull.Value para evitar que la aplicación crashee si rfc o direccion vienen nulos
+                string query = "INSERT INTO Empresa (idUsuario, nombre, rfc, direccion) VALUES (@idUsr, @nom, @rfc, @dir)";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@idUsr", e.idUsuario);
+                    cmd.Parameters.AddWithValue("@nom", e.nombre);
+                    cmd.Parameters.AddWithValue("@rfc", string.IsNullOrWhiteSpace(e.rfc) ? DBNull.Value : e.rfc);
+                    cmd.Parameters.AddWithValue("@dir", string.IsNullOrWhiteSpace(e.direccion) ? DBNull.Value : e.direccion);
+
+                    cmd.ExecuteNonQuery();
+                    return "OK";
                 }
             }
         }
