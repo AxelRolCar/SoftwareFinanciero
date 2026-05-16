@@ -1,58 +1,219 @@
 ﻿@page "/dashboard"
+@using finapro.Models
+@using finapro.Data
+@inject DataService DB
+@inject AppState State
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>Panel de Control</h3>
-        <select class="form-select w-auto">
-            <option>Mes Actual</option>
-            <option>Mes Anterior</option>
-            <option>Año Actual</option>
-        </select>
-    </div>
+    @if (State?.EmpresaActiva == null)
+    {
+        <div class="card text-center p-5 shadow-sm border-0 mt-5 mx-auto" style="max-width: 600px;">
+            <div class="card-body">
+                <div class="text-primary display-1 mb-3">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </div>
+                <h3 class="fw-bold mb-3">¡Bienvenido a FinaPro!</h3>
+                <p class="text-muted">Para poder generar reportes, calcular tus utilidades y ver gráficos de flujo de caja, primero necesitas registrar tu empresa.</p>
+                <a href="/cuenta" class="btn btn-success btn-lg mt-3">Configurar mi primera empresa</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-4 mt-3">
+            <h3>Panel de Control - @State.EmpresaActiva.nombre</h3>
+            <select class="form-select w-auto fw-bold" @bind="PeriodoSeleccionado">
+                <option value="Mes Actual">Mes Actual</option>
+                <option value="Mes Anterior">Mes Anterior</option>
+                <option value="Año Actual">Año Actual</option>
+                <option value="Todo">Todo el Historial</option>
+            </select>
+        </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm border-start border-success border-4 p-3">
-                <span class="text-muted small fw-bold">INGRESOS</span>
-                <h3 class="text-success">$0.00</h3>
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm border-start border-success border-4 p-3 h-100">
+                    <span class="text-muted small fw-bold">INGRESOS</span>
+                    <h3 class="text-success">@totalIngresos.ToString("C")</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm border-start border-danger border-4 p-3 h-100">
+                    <span class="text-muted small fw-bold">GASTOS</span>
+                    <h3 class="text-danger">@totalGastos.ToString("C")</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm border-start border-info border-4 p-3 h-100">
+                    <span class="text-muted small fw-bold">UTILIDAD NETA</span>
+                    <h3 class="text-info">@utilidadNeta.ToString("C")</h3>
+                </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm border-start border-danger border-4 p-3">
-                <span class="text-muted small fw-bold">GASTOS</span>
-                <h3 class="text-danger">$0.00</h3>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm border-start border-info border-4 p-3">
-                <span class="text-muted small fw-bold">UTILIDAD NETA</span>
-                <h3 class="text-info">$0.00</h3>
-            </div>
-        </div>
-    </div>
 
-    <div class="row">
-        <div class="col-md-8 mb-4">
-            <div class="card shadow-sm p-4 h-100">
-                <h5>Flujo de Caja (12 meses)</h5>
-                <div class="bg-light d-flex align-items-end justify-content-around" style="height: 250px;">
-                    @for (int i = 0; i < 12; i++)
+        <div class="row row-cols-1 row-cols-lg-2 g-4">
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="mb-4">Ingresos vs Gastos (@DateTime.Now.Year)</h5>
+                    <div class="bg-light d-flex align-items-end justify-content-around rounded" style="height: 250px; padding-top: 20px;">
+                        @for (int i = 1; i <= 12; i++)
+                        {
+                            var alturas = ObtenerAlturasMes(i);
+                            <div class="d-flex flex-column justify-content-end align-items-center h-100" style="width: 8%;">
+                                <div class="d-flex w-100 justify-content-center align-items-end" style="height: 100%;">
+                                    <div class="bg-success opacity-75 rounded-top" style="width: 12px; height: @(alturas.Ingreso)%; margin-right: 2px;" title="Ingresos: @ObtenerNombreMes(i)"></div>
+                                    <div class="bg-danger opacity-75 rounded-top" style="width: 12px; height: @(alturas.Gasto)%;" title="Gastos: @ObtenerNombreMes(i)"></div>
+                                </div>
+                                <small class="text-muted mt-2" style="font-size: 10px;">@ObtenerNombreMes(i).Substring(0, 3)</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm p-4 h-100 text-center d-flex flex-column align-items-center">
+                    <h5 class="mb-4 w-100 text-start">Gastos por Categoría</h5>
+                    
+                    @if (totalGastos > 0)
                     {
-                        <div class="bg-primary opacity-25" style="width: 30px; height: @(i * 15 + 20)px;"></div>
+                        <div class="rounded-circle border border-5 border-light mt-2 mb-4 d-flex align-items-center justify-content-center shadow-sm"
+                             style="width: 200px; height: 200px; background: @GenerarGraficoPastel(); transition: background 0.5s;">
+                            <div class="bg-white rounded-circle shadow-sm" style="width: 130px; height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <small class="text-muted">Total</small>
+                                <strong class="fs-5 text-danger">@totalGastos.ToString("C0")</strong>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted d-flex align-items-center justify-content-center rounded-circle bg-light" style="width: 200px; height: 200px;">
+                            Sin gastos en el periodo
+                        </div>
                     }
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm p-4 h-100 text-center">
-                <h5>Gastos por Categoría</h5>
-                <div class="rounded-circle border border-5 border-light mx-auto my-auto d-flex align-items-center justify-content-center"
-                     style="width: 200px; height: 200px; background: conic-gradient(#0d6efd 40%, #ffc107 0 70%, #dc3545 0);">
-                    <div class="bg-white rounded-circle" style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center;">
-                        <strong>Total</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    }
 </div>
+
+@code {
+    List<Transaccion> todasLasTransacciones = new();
+    List<Transaccion> transaccionesFiltradas = new();
+
+    decimal totalIngresos = 0;
+    decimal totalGastos = 0;
+    decimal utilidadNeta = 0;
+
+    // Propiedad con respaldo para detectar cuando el usuario cambia el menú desplegable
+    string _periodoSeleccionado = "Mes Actual";
+    string PeriodoSeleccionado
+    {
+        get => _periodoSeleccionado;
+        set
+        {
+            _periodoSeleccionado = value;
+            FiltrarDatos(); // Se vuelve a calcular todo si el filtro cambia
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (State?.EmpresaActiva != null)
+        {
+            todasLasTransacciones = DB.ObtenerTransacciones(State.EmpresaActiva.id);
+            FiltrarDatos();
+        }
+    }
+
+    // --- LÓGICA DE FILTRADO Y CÁLCULOS ---
+    void FiltrarDatos()
+    {
+        DateTime hoy = DateTime.Now;
+
+        transaccionesFiltradas = todasLasTransacciones.Where(t =>
+        {
+            if (PeriodoSeleccionado == "Mes Actual")
+                return t.fecha.Month == hoy.Month && t.fecha.Year == hoy.Year;
+
+            if (PeriodoSeleccionado == "Mes Anterior")
+            {
+                var mesAnterior = hoy.AddMonths(-1);
+                return t.fecha.Month == mesAnterior.Month && t.fecha.Year == mesAnterior.Year;
+            }
+
+            if (PeriodoSeleccionado == "Año Actual")
+                return t.fecha.Year == hoy.Year;
+
+            // "Todo" devuelve siempre verdadero
+            return true;
+        }).ToList();
+
+        // Calcular los totales de las tarjetas superiores
+        totalIngresos = transaccionesFiltradas.Where(t => t.tipo == "Ingreso").Sum(t => t.monto);
+        totalGastos = transaccionesFiltradas.Where(t => t.tipo == "Gasto").Sum(t => t.monto);
+        utilidadNeta = totalIngresos - totalGastos;
+    }
+
+    // --- LÓGICA DEL GRÁFICO DE BARRAS ---
+    (int Ingreso, int Gasto) ObtenerAlturasMes(int mes)
+    {
+        int anioAFiltrar = DateTime.Now.Year;
+        
+        var ingresosMes = todasLasTransacciones.Where(t => t.fecha.Month == mes && t.fecha.Year == anioAFiltrar && t.tipo == "Ingreso").Sum(t => t.monto);
+        var gastosMes = todasLasTransacciones.Where(t => t.fecha.Month == mes && t.fecha.Year == anioAFiltrar && t.tipo == "Gasto").Sum(t => t.monto);
+
+        // Encontramos el mes con más movimiento en todo el año para sacar un 100% relativo y escalar las barras
+        var maximoAnual = todasLasTransacciones.Where(t => t.fecha.Year == anioAFiltrar).GroupBy(t => t.fecha.Month).Select(g => g.Sum(x => x.monto)).DefaultIfEmpty(1).Max();
+        if (maximoAnual == 0) maximoAnual = 1; // Evitar división por cero
+
+        // Calculamos la altura en porcentaje (máximo 100%)
+        int pctIngreso = (int)((ingresosMes / maximoAnual) * 100);
+        int pctGasto = (int)((gastosMes / maximoAnual) * 100);
+
+        return (pctIngreso, pctGasto);
+    }
+
+    string ObtenerNombreMes(int mes)
+    {
+        string[] meses = { "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
+        return meses[mes];
+    }
+
+    // --- LÓGICA DEL GRÁFICO DE PASTEL DINÁMICO ---
+    string GenerarGraficoPastel()
+    {
+        if (totalGastos == 0) return "conic-gradient(#ccc 0 100%)";
+
+        // Agrupamos los gastos por nombre de categoría
+        var categoriasAgrupadas = transaccionesFiltradas
+            .Where(t => t.tipo == "Gasto")
+            .GroupBy(t => t.nombreCategoria)
+            .Select(g => new { Categoria = g.Key, Total = g.Sum(x => x.monto) })
+            .ToList();
+
+        // Paleta de colores atractiva
+        string[] paleta = { "#dc3545", "#fd7e14", "#ffc107", "#0d6efd", "#6f42c1", "#20c997" };
+        string gradient = "conic-gradient(";
+        
+        decimal porcentajeAcumulado = 0;
+        int colorIdx = 0;
+
+        for (int i = 0; i < categoriasAgrupadas.Count; i++)
+        {
+            decimal porcentaje = (categoriasAgrupadas[i].Total / totalGastos) * 100;
+            decimal inicio = porcentajeAcumulado;
+            porcentajeAcumulado += porcentaje;
+
+            string colorActual = paleta[colorIdx % paleta.Length];
+            // Construimos la rebanada de la gradiente: "Color Inicio% Fin%"
+            gradient += $"{colorActual} {inicio.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}% {porcentajeAcumulado.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%";
+            
+            if (i < categoriasAgrupadas.Count - 1) gradient += ", ";
+            colorIdx++;
+        }
+
+        gradient += ")";
+        return gradient;
+    }
+}
