@@ -1,16 +1,117 @@
 ﻿@page "/ia-asistente"
+@using finapro.Data
+@inject DataService DB
+@inject AIService AI
+@inject AppState State
 
-<div class="container h-100 d-flex flex-column" style="max-height: 80vh;">
-    <h3>Asistente IA Financiero</h3>
-    <div class="flex-grow-1 bg-white border rounded p-3 mb-3 shadow-sm overflow-auto">
-        <div class="mb-3 text-start">
-            <div class="d-inline-block p-2 bg-light rounded text-dark small" style="max-width: 80%;">
-                ¡Hola! Soy tu asistente. ¿Quieres que analicemos tus gastos de este mes?
-            </div>
+<div class="container mt-4">
+    <h3><i class="bi bi-robot text-primary me-2"></i>Asistente Inteligente Predictivo</h3>
+    
+    <div class="card shadow-sm mb-3 border-0">
+        <div class="card-body rounded bg-light" style="height: 450px; overflow-y: auto; border: 1px solid #dee2e6;">
+            @if (estaCargando)
+            {
+                <div class="text-center text-muted mt-5">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="fw-bold">FinaBot está proyectando tus trayectorias financieras...</p>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(respuestaIA))
+            {
+                <div class="p-4 bg-white rounded shadow-sm border-start border-primary border-4 text-dark">
+                    @ConvertirMarkdownAHtml(respuestaIA)
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted mt-5 px-3">
+                    <i class="bi bi-graph-up-arrow display-4 text-secondary mb-3 d-block"></i>
+                    <p class="fs-5">¡Hola! Pregúntame sobre tus ingresos, gastos o balance general.</p>
+                    <small>Estoy listo para ayudarte a predecir tendencias, planificar decisiones de inversión y evaluar el futuro de tu negocio.</small>
+                </div>
+            }
         </div>
     </div>
-    <div class="input-group">
-        <input type="text" class="form-control" placeholder="Escribe tu duda financiera..." />
-        <button class="btn btn-primary">Preguntar</button>
+
+    <div class="input-group input-group-lg shadow-sm">
+        <input type="text" class="form-control fs-6" @bind="preguntaUsuario" @bind:event="oninput" @onkeyup="ManejarEnter"
+               placeholder="Ej: Si mantengo este nivel de gastos en los próximos 3 meses, ¿cómo afectará mi utilidad?" disabled="@estaCargando" />
+        <button class="btn btn-primary px-4 fs-6 fw-bold" @onclick="Preguntar" disabled="@(estaCargando || string.IsNullOrWhiteSpace(preguntaUsuario))">
+            <i class="bi bi-cpu-fill me-2"></i> Analizar Futuro
+        </button>
     </div>
 </div>
+
+@code {
+    string preguntaUsuario = "";
+    string respuestaIA = "";
+    bool estaCargando = false;
+
+    async Task Preguntar()
+    {
+        if (string.IsNullOrWhiteSpace(preguntaUsuario)) return;
+
+        estaCargando = true;
+        respuestaIA = ""; // Limpiamos la última respuesta para dar efecto de carga
+        StateHasChanged();
+        
+        // Extrae los datos reales procesados de la base de datos
+        string datos = DB.ObtenerResumenParaIA(State?.EmpresaActiva?.id ?? 0);
+        
+        // Consulta el servicio con el prompt estructurado
+        respuestaIA = await AI.ConsultarAsistente(preguntaUsuario, datos);
+        
+        estaCargando = false;
+        preguntaUsuario = ""; // Resetea el input del chat
+    }
+
+    async Task ManejarEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(preguntaUsuario) && !estaCargando)
+        {
+            await Preguntar();
+        }
+    }
+
+    // Convertidor liviano casero de Markdown a HTML para mantener la app ligera y rápida
+    private MarkupString ConvertirMarkdownAHtml(string textoMarkdown)
+    {
+        if (string.IsNullOrEmpty(textoMarkdown)) return (MarkupString)"";
+
+        // 1. Reemplazar líneas separadoras --- por hr estilizados
+        string html = textoMarkdown.Replace("---", "<hr class='my-3 style=\"border-top: 1px dashed #ccc;\"' />");
+
+        // 2. Procesar títulos y listas de viñetas por línea
+        var lineas = html.Split('\n');
+        for (int i = 0; i < lineas.Length; i++)
+        {
+            string linea = lineas[i].Trim();
+            if (linea.StartsWith("### "))
+            {
+                lineas[i] = $"<h5 class='fw-bold text-dark mt-3 mb-2 d-flex align-items-center'>{linea.Substring(4)}</h5>";
+            }
+            else if (linea.StartsWith("* "))
+            {
+                lineas[i] = $"<div class='ms-3 my-1 text-muted'>• {linea.Substring(2)}</div>";
+            }
+        }
+        html = string.Join("\n", lineas);
+
+        // 3. Reemplazar los marcadores de negrita **texto** por etiquetas strong
+        while (html.Contains("**"))
+        {
+            int primerIndice = html.IndexOf("**");
+            html = html.Remove(primerIndice, 2).Insert(primerIndice, "<strong>");
+            if (html.Contains("**"))
+            {
+                int segundoIndice = html.IndexOf("**");
+                html = html.Remove(segundoIndice, 2).Insert(segundoIndice, "</strong>");
+            }
+        }
+
+        // 4. Convertir saltos de línea crudos a saltos HTML reales
+        html = html.Replace("\n", "<br/>");
+
+        return (MarkupString)html;
+    }
+}

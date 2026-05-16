@@ -4,6 +4,7 @@ using finapro.Data;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<DataService>();
 builder.Services.AddScoped<AppState>();
+builder.Services.AddHttpClient<AIService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

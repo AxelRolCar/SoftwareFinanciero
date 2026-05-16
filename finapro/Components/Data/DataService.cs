@@ -310,5 +310,26 @@ namespace finapro.Data
                 }
             }
         }
+
+        public string ObtenerResumenParaIA(int idEmpresa)
+        {
+            var transacciones = ObtenerTransacciones(idEmpresa); // Reutilizamos el método que ya tienes
+            if (transacciones.Count == 0) return "La empresa no tiene transacciones registradas aún.";
+
+            decimal totalIngresos = transacciones.Where(t => t.tipo == "Ingreso").Sum(t => t.monto);
+            decimal totalGastos = transacciones.Where(t => t.tipo == "Gasto").Sum(t => t.monto);
+            decimal balance = totalIngresos - totalGastos;
+
+            string resumen = $"Total de Ingresos: ${totalIngresos}. Total de Gastos: ${totalGastos}. Balance actual: ${balance}. ";
+            resumen += "Últimos movimientos: ";
+
+            // Tomamos las últimas 5 transacciones para darle contexto de en qué se gasta
+            foreach (var t in transacciones.OrderByDescending(x => x.fecha).Take(5))
+            {
+                resumen += $"[{t.fecha.ToString("dd/MM")}] {t.concepto} ({t.tipo}): ${t.monto}. ";
+            }
+
+            return resumen;
+        }
     }
 }
