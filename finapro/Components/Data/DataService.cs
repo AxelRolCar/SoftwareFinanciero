@@ -331,5 +331,48 @@ namespace finapro.Data
 
             return resumen;
         }
+
+        public List<int> ObtenerLeccionesCompletadas(int idUsuario)
+        {
+            List<int> completadas = new List<int>();
+            string query = "SELECT id_leccion FROM progreso_aprendizaje WHERE id_usuario = @idUsuario";
+
+            using (var connection = new MySqlConnection(cadenaConexion))
+            {
+                connection.Open();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@idUsuario", idUsuario);
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            completadas.Add(reader.GetInt32("id_leccion"));
+                        }
+                    }
+                }
+            }
+            return completadas;
+        }
+
+        // 2. Método para registrar que una lección ha sido finalizada con éxito
+        public void GuardarProgresoLeccion(int idUsuario, int idLeccion)
+        {
+            // Usamos INSERT IGNORE o ON DUPLICATE KEY para evitar errores si el usuario repite el quiz
+            string query = @"INSERT INTO progreso_aprendizaje (id_usuario, id_leccion) 
+                     VALUES (@idUsuario, @idLeccion) 
+                     ON DUPLICATE KEY UPDATE fecha_completado = CURRENT_TIMESTAMP";
+
+            using (var connection = new MySqlConnection(cadenaConexion))
+            {
+                connection.Open();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@idUsuario", idUsuario);
+                    command.Parameters.AddWithValue("@idLeccion", idLeccion);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
     }
 }
