@@ -1,37 +1,510 @@
 ﻿@page "/educacion"
+@inject Data.DataService DB
+@inject Data.AppState State
 
-<div class="container">
-    <h3>Camino de Aprendizaje</h3>
+<div class="container mt-4" style="max-width: 900px;">
     
-    <div class="mb-5 mt-4">
-        <div class="d-flex justify-content-between mb-1">
-            <span>Nivel: <strong>Inicio</strong></span>
-            <span>40% Completado</span>
+    @if (leccionActiva == null)
+    {
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3><i class="bi bi-mortarboard-fill text-primary"></i> Academia FinaPro</h3>
+            <span class="badge bg-primary fs-6">@CalcularProgreso()% Completado</span>
         </div>
-        <div class="progress" style="height: 10px;">
-            <div class="progress-bar bg-info" style="width: 40%"></div>
-        </div>
-    </div>
+        <p class="text-muted">Domina las finanzas de tu negocio lección por lección.</p>
 
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-body">
-                    <div class="text-primary mb-2"><span class="oi oi-media-play"></span></div>
-                    <h5>Control de Costos</h5>
-                    <p class="small text-muted">Aprende a diferenciar entre costos fijos y variables.</p>
-                    <button class="btn btn-sm btn-primary">Ver Lección</button>
+        <div class="progress mb-5 shadow-sm" style="height: 15px; border-radius: 10px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                 role="progressbar" 
+                 style="width: @CalcularProgreso()%; transition: width 0.5s ease;"></div>
+        </div>
+
+        @foreach (var modulo in ListaModulos)
+        {
+            <div class="mb-5">
+                <h4 class="text-secondary fw-bold mb-3">
+                    <span class="badge bg-secondary me-2">Módulo @modulo.Id</span> @modulo.Nombre
+                </h4>
+                
+                <div class="row g-3">
+                    @foreach (var leccion in modulo.Lecciones)
+                    {
+                        bool estaDesbloqueada = EsLeccionDesbloqueada(modulo, leccion);
+                        
+                        <div class="col-md-6">
+                            <div class="card h-100 shadow-sm border-0 transition-card @(leccion.Completada ? "border-start border-success border-4" : "") @(!estaDesbloqueada ? "opacity-75 bg-light" : "")">
+                                <div class="card-body d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h5 class="card-title fw-bold mb-0 @(estaDesbloqueada ? "text-dark" : "text-muted")">
+                                                @leccion.Titulo
+                                            </h5>
+                                            @if (leccion.Completada)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle-fill"></i> Completado</span>
+                                            }
+                                            else if (!estaDesbloqueada)
+                                            {
+                                                <span class="text-muted"><i class="bi bi-lock-fill"></i></span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Disponible</span>
+                                            }
+                                        </div>
+                                        <p class="card-text small text-muted">@leccion.Descripcion</p>
+                                    </div>
+                                    
+                                    <div class="mt-3">
+                                        @if (estaDesbloqueada)
+                                        {
+                                            <button class="btn btn-sm @(leccion.Completada ? "btn-outline-success" : "btn-primary") w-100" 
+                                                    @onclick="() => IniciarLeccion(leccion)">
+                                                @(leccion.Completada ? "Repasar Lección" : "Iniciar Lección 🚀")
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-secondary w-100" disabled>
+                                                <i class="bi bi-lock-fill"></i> Bloqueado
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0 opacity-75">
-                <div class="card-body">
-                    <div class="text-muted mb-2"><span class="oi oi-lock-locked"></span></div>
-                    <h5>Gestión de Impuestos</h5>
-                    <p class="small text-muted">Disponible al completar el nivel inicial.</p>
-                </div>
+        }
+    }
+    else if (!mostrandoQuiz)
+    {
+        <div class="card shadow border-0 p-4 animate-fade">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <span class="text-primary fw-bold">@leccionActiva.Titulo</span>
+                <span class="text-muted small">Paso @(pasoActual + 1) de @leccionActiva.PasosTeoria.Count</span>
+            </div>
+
+            <div class="progress mb-4" style="height: 6px;">
+                <div class="progress-bar bg-primary" style="width: @(((pasoActual + 1) * 100) / leccionActiva.PasosTeoria.Count)%"></div>
+            </div>
+
+            <div class="card-body py-4 bg-light rounded text-center mb-4">
+                <p class="fs-5 text-dark lh-base px-3" style="white-space: pre-line;">
+                    @leccionActiva.PasosTeoria[pasoActual]
+                </p>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="AnteriorPaso" disabled="@(pasoActual == 0)">
+                    <i class="bi bi-arrow-left"></i> Atrás
+                </button>
+                
+                @if (pasoActual < leccionActiva.PasosTeoria.Count - 1)
+                {
+                    <button class="btn btn-primary px-4" @onclick="SiguientePaso">
+                        Siguiente <i class="bi bi-arrow-right"></i>
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-success px-4" @onclick="IrAlQuiz">
+                        Ir al Reto 🎯
+                    </button>
+                }
             </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="card shadow border-0 p-4 animate-fade">
+            <div class="text-center mb-4">
+                <span class="badge bg-warning text-dark px-3 py-2 fs-6">🎯 Pon a prueba tu conocimiento</span>
+                <h4 class="fw-bold mt-3 px-2">@leccionActiva.Quiz.Enunciado</h4>
+            </div>
+
+            <div class="list-group mb-4">
+                @for (int i = 0; i < leccionActiva.Quiz.Opciones.Count; i++)
+                {
+                    int index = i;
+                    <button type="button" 
+                            class="list-group-item list-group-item-action py-3 px-4 mb-2 rounded border @ObtenerClaseOpcion(index)"
+                            disabled="@bloquearOpciones"
+                            @onclick="() => SeleccionarOpcion(index)">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>@leccionActiva.Quiz.Opciones[index]</span>
+                            @if (opcionSeleccionada == index)
+                            {
+                                @if (esCorrecto)
+                                { <i class="bi bi-check-circle-fill text-success fs-5"></i> }
+                                else
+                                { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
+                            }
+                        </div>
+                    </button>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensajeFeedback))
+            {
+                <div class="alert @(esCorrecto ? "alert-success" : "alert-danger") text-center fw-bold shadow-sm p-3 mb-4 animate-fade">
+                    @mensajeFeedback
+                </div>
+            }
+
+            <div class="d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" @onclick="RegresarAMapa" disabled="@(esCorrecto)">
+                    <i class="bi bi-x-lg"></i> Salir del curso
+                </button>
+
+                @if (esCorrecto)
+                {
+                    <button class="btn btn-success px-5 py-2 fw-bold shadow" @onclick="FinalizarLecciónExitosa">
+                        Terminar Lección ¡Listo! ✨
+                    </button>
+                }
+                else if (opcionSeleccionada != null && !esCorrecto)
+                {
+                    <button class="btn btn-warning px-4" @onclick="ReiniciarQuiz">
+                        Intentar de Nuevo 🔄
+                    </button>
+                }
+            </div>
+        </div>
+    }
 </div>
+
+<style>
+    .transition-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .transition-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .animate-fade {
+        animation: fadeIn 0.4s ease-in-out;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    // --- MODELOS DE DATOS ---
+    public class Modulo
+    {
+        public int Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public List<Leccion> Lecciones { get; set; } = new();
+    }
+
+    public class Leccion
+    {
+        public int Id { get; set; }
+        public string Titulo { get; set; } = "";
+        public string Descripcion { get; set; } = "";
+        public List<string> PasosTeoria { get; set; } = new();
+        public PreguntaQuiz Quiz { get; set; } = new();
+        public bool Completada { get; set; }
+    }
+
+    public class PreguntaQuiz
+    {
+        public string Enunciado { get; set; } = "";
+        public List<string> Opciones { get; set; } = new();
+        public int OpcionCorrecta { get; set; }
+    }
+
+    // --- VARIABLES DE ESTADO ---
+    private List<Modulo> ListaModulos = new();
+    private Leccion? leccionActiva = null;
+    private int pasoActual = 0;
+    private bool mostrandoQuiz = false;
+    private int? opcionSeleccionada = null;
+    private bool esCorrecto = false;
+    private bool bloquearOpciones = false;
+    private string mensajeFeedback = "";
+
+    protected override void OnInitialized()
+    {
+        CargarPlanEstudios();
+        CargarProgresoDesdeBD();
+    }
+
+    // --- CARGA DEL CONTENIDO DIDÁCTICO ---
+    private void CargarPlanEstudios()
+    {
+        ListaModulos = new List<Modulo>
+        {
+            new Modulo
+            {
+                Id = 1,
+                Nombre = "Cimientos Financieros 💸",
+                Lecciones = new List<Leccion>
+                {
+                    new Leccion
+                    {
+                        Id = 1,
+                        Titulo = "El Flujo de Efectivo",
+                        Descripcion = "Aprende el verdadero significado del dinero circulante en tu negocio.",
+                        PasosTeoria = new List<string>
+                        {
+                            "¡Bienvenido a FinaPro Academia! 👋\n\nEl Flujo de Efectivo es el indicador que muestra cómo se mueve el dinero en efectivo que entra y sale de tu cuenta.",
+                            "⚠️ Mito Emprendedor:\n\"Vender mucho significa tener un negocio exitoso\".\n\n¡Falso! Si vendes $10,000 a crédito y tienes que pagar la luz hoy por $2,000 en efectivo, tu flujo de efectivo está en problemas aunque tengas muchas ventas en papel.",
+                            "💡 Regla de oro:\n\nMonitorea los tiempos de cobro a tus clientes para asegurar que siempre haya dinero disponible en caja para cubrir tus compromisos inmediatos."
+                        },
+                        Quiz = new PreguntaQuiz
+                        {
+                            Enunciado = "Si vendiste $5,000 a crédito (te pagan el próximo mes) y hoy debes pagar $2,000 de renta obligatoria en efectivo, ¿cómo está tu flujo de efectivo hoy?",
+                            Opciones = new List<string> {
+                                "A) Positivo, porque mis ventas superan a mis deudas.",
+                                "B) Negativo, porque tengo un compromiso inmediato de efectivo y no cuento con la liquidez real hoy.",
+                                "C) Balanceado, el sistema lo compensa automáticamente."
+                            },
+                            OpcionCorrecta = 1
+                        }
+                    },
+                    new Leccion
+                    {
+                        Id = 2,
+                        Titulo = "Ingreso vs Gasto",
+                        Descripcion = "Aprende a catalogar correctamente cada transacción para proyecciones precisas.",
+                        PasosTeoria = new List<string>
+                        {
+                            "Para que las gráficas y la Inteligencia Artificial de FinaPro funcionen al 100%, es vital entender el origen de tus movimientos.",
+                            "📈 Ingreso: Es toda entrada de dinero que resulta de la actividad de tu negocio (Ventas de productos, prestación de servicios, etc.).",
+                            "📉 Gasto: Son las salidas de dinero necesarias para mantener operando la empresa (Pago de sueldos, compra de insumos, renta de locales)."
+                        },
+                        Quiz = new PreguntaQuiz
+                        {
+                            Enunciado = "Don Pepe administra una hamburguesería y compra bolsas de plástico y servilletas para entregar los pedidos. ¿Cómo debe registrar este movimiento en FinaPro?",
+                            Opciones = new List<string> {
+                                "A) Como un Ingreso por concepto de Atención al cliente.",
+                                "B) Como un Gasto asignado a la categoría de 'Insumos'.",
+                                "C) No debe registrarse por ser un gasto pequeño."
+                            },
+                            OpcionCorrecta = 1
+                        }
+                    }
+                }
+            },
+            new Modulo
+            {
+                Id = 2,
+                Nombre = "Salud y Optimización ⚖️",
+                Lecciones = new List<Leccion>
+                {
+                    new Leccion
+                    {
+                        Id = 3,
+                        Titulo = "El Punto de Equilibrio",
+                        Descripcion = "Descubre la meta mínima de ventas que necesita tu negocio para no perder dinero.",
+                        PasosTeoria = new List<string>
+                        {
+                            "El Punto de Equilibrio es el momento exacto donde tus ingresos totales igualan a tus costos totales.",
+                            "En este punto del mes, tu negocio tiene una utilidad exacta de $0. Significa que no estás ganando dinero todavía, pero ¡tampoco estás perdiendo ni un solo peso! ⚖️",
+                            "Conocer este número te da una meta clara: cada venta realizada después de alcanzar tu punto de equilibrio representa ganancia pura y neta para ti."
+                        },
+                        Quiz = new PreguntaQuiz
+                        {
+                            Enunciado = "Si tus costos fijos mensuales son de $10,000 y cada producto vendido te deja $100 de ganancia limpia, ¿cuántos artículos necesitas vender mínimos para alcanzar tu punto de equilibrio?",
+                            Opciones = new List<string> {
+                                "A) 50 productos.",
+                                "B) 100 productos.",
+                                "C) 1,000 productos."
+                            },
+                            OpcionCorrecta = 1
+                        }
+                    },
+                    new Leccion
+                    {
+                        Id = 4,
+                        Titulo = "Gastos Hormiga en el Negocio",
+                        Descripcion = "Detecta y elimina las pequeñas fugas de dinero silenciosas.",
+                        PasosTeoria = new List<string>
+                        {
+                            "Los Gastos Hormiga son pequeñas compras recurrentes que parecen insignificantes a simple vista, pero acumuladas al mes destruyen tu utilidad.",
+                            "🐜 Ejemplos en un negocio: Suscripciones de software que nadie usa, comisiones bancarias por no revisar cuentas o desperdicio constante de papelería.",
+                            "FinaPro te permite agrupar y visualizar estos detalles en la sección de Gráficas para frenar fugas de capital a tiempo."
+                        },
+                        Quiz = new PreguntaQuiz
+                        {
+                            Enunciado = "¿Cuál es la mejor estrategia para combatir los gastos hormiga operativos?",
+                            Opciones = new List<string> {
+                                "A) Registrar absolutamente todo, por mínimo que sea, y auditar las categorías mensualmente.",
+                                "B) Dejar de comprar insumos esenciales del negocio.",
+                                "C) Ignorarlos, ya que no afectan a los gastos grandes como la renta."
+                            },
+                            OpcionCorrecta = 0
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    // --- LÓGICA DE CONTROL DE FLUJO ---
+    private void IniciarLeccion(Leccion leccion)
+    {
+        leccionActiva = leccion;
+        pasoActual = 0;
+        mostrandoQuiz = false;
+        ReiniciarQuiz();
+    }
+
+    private void SiguientePaso()
+    {
+        if (leccionActiva != null && pasoActual < leccionActiva.PasosTeoria.Count - 1)
+        {
+            pasoActual++;
+        }
+    }
+
+    private void AnteriorPaso()
+    {
+        if (pasoActual > 0)
+        {
+            pasoActual--;
+        }
+    }
+
+    private void IrAlQuiz()
+    {
+        mostrandoQuiz = true;
+    }
+
+    private void SeleccionarOpcion(int indice)
+    {
+        if (leccionActiva == null) return;
+        
+        opcionSeleccionada = indice;
+        bloquearOpciones = true;
+
+        if (indice == leccionActiva.Quiz.OpcionCorrecta)
+        {
+            esCorrecto = true;
+            mensajeFeedback = "🎉 ¡Excelente trabajo! Respuesta correcta. Has comprendido perfectamente el concepto.";
+        }
+        else
+        {
+            esCorrecto = false;
+            mensajeFeedback = "❌ Respuesta incorrecta. ¡No te preocupes! Repasa la teoría e inténtalo de nuevo.";
+        }
+    }
+
+    private void ReiniciarQuiz()
+    {
+        opcionSeleccionada = null;
+        esCorrecto = false;
+        bloquearOpciones = false;
+        mensajeFeedback = "";
+    }
+
+    private void FinalizarLecciónExitosa()
+    {
+        if (leccionActiva != null)
+        {
+            leccionActiva.Completada = true;
+
+            try
+            {
+                // <-- PASO NUEVO: Persistir de forma permanente en el servidor MySQL
+                int idUsuarioActual = State?.EmpresaActiva?.id ?? 0;
+                DB.GuardarProgresoLeccion(idUsuarioActual, leccionActiva.Id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"No se pudo guardar el progreso: {ex.Message}");
+            }
+        }
+        RegresarAMapa();
+    }
+
+    private void RegresarAMapa()
+    {
+        leccionActiva = null;
+        mostrandoQuiz = false;
+        ReiniciarQuiz();
+    }
+
+    // --- AUXILIARES Y GAMIFICACIÓN ---
+    private int CalcularProgreso()
+    {
+        int totalLecciones = ListaModulos.Sum(m => m.Lecciones.Count);
+        if (totalLecciones == 0) return 0;
+
+        int completadas = ListaModulos.Sum(m => m.Lecciones.Count(l => l.Completada));
+        return (completadas * 100) / totalLecciones;
+    }
+
+    private bool EsLeccionDesbloqueada(Modulo moduloActual, Leccion leccionActual)
+    {
+        // La primera lección del módulo 1 siempre está abierta
+        if (moduloActual.Id == 1 && leccionActual.Id == moduloActual.Lecciones.First().Id)
+        {
+            return true;
+        }
+
+        // Aplanamos todas las lecciones en orden correlativo para validar la anterior inmediata
+        var todasLasLecciones = ListaModulos.OrderBy(m => m.Id).SelectMany(m => m.Lecciones).ToList();
+        int indexActual = todasLasLecciones.FindIndex(l => l.Id == leccionActual.Id);
+
+        if (indexActual > 0)
+        {
+            // Está desbloqueada si la anterior ya fue completada con éxito
+            return todasLasLecciones[indexActual - 1].Completada;
+        }
+
+        return false;
+    }
+
+    private string ObtenerClaseOpcion(int index)
+    {
+        if (opcionSeleccionada == null) return "bg-white text-dark";
+
+        if (opcionSeleccionada == index)
+        {
+            return esCorrecto ? "bg-success-subtle border-success text-success-emphasis fw-bold" : "bg-danger-subtle border-danger text-danger-emphasis fw-bold";
+        }
+
+        if (leccionActiva != null && index == leccionActiva.Quiz.OpcionCorrecta && opcionSeleccionada != null)
+        {
+            return "bg-success-subtle border-success text-success-emphasis fw-bold";
+        }
+
+        return "bg-light text-muted opacity-50";
+    }
+
+    private void CargarProgresoDesdeBD()
+    {
+        try
+        {
+            // Usamos el ID del usuario o empresa activa en la sesión de la app
+            int idUsuarioActual = State?.EmpresaActiva?.id ?? 0; 
+
+            // Consultamos a la base de datos el listado de IDs completados
+            List<int> leccionesCompletadas = DB.ObtenerLeccionesCompletadas(idUsuarioActual);
+
+            // Marcamos como completadas las lecciones que coincidan en nuestro mapa local
+            foreach (var modulo in ListaModulos)
+            {
+                foreach (var leccion in modulo.Lecciones)
+                {
+                    if (leccionesCompletadas.Contains(leccion.Id))
+                    {
+                        leccion.Completada = true;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Opcional: Manejo o impresión de error en consola de depuración en caso de falla de red
+            Console.WriteLine($"Error al conectar con el progreso de MySQL: {ex.Message}");
+        }
+    }
+
+
+}
